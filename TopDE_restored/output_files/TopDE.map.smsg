@@ -1,0 +1,2 @@
+Warning (10268): Verilog HDL information at ALU.v(21): always construct contains both blocking and non-blocking assignments File: C:/Users/Evelyn/Downloads/GrupoD8_Lab3/GrupoD8_Lab3/TopDE_restored/ALU.v Line: 21
+Warning (10268): Verilog HDL information at Registers.v(37): always construct contains both blocking and non-blocking assignments File: C:/Users/Evelyn/Downloads/GrupoD8_Lab3/GrupoD8_Lab3/TopDE_restored/Registers.v Line: 37

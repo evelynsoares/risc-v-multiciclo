@@ -1,0 +1,136 @@
+`ifndef PARAM
+	`include "Parametros.v"
+`endif
+
+module ControlMulticiclo (
+    input  logic clock, reset,
+    input  logic [6:0] opcode,
+    output logic [3:0] estadoAtual, proximoEstado,
+    output logic MemRead, MemWrite, RegWrite, ALUSrc, MemtoReg, Branch, Jump, Jalr,
+    output logic [1:0] ALUOp
+);
+
+    // Estados da FSM codificados
+    typedef enum logic [3:0] {
+        IFETCH     = 4'd0, // Busca instrucao
+        WAIT_IF    = 4'd1, // Espera instrucao (2o ciclo)
+        ID         = 4'd2, // Decodificacao
+        EX_R       = 4'd3, // Execucao tipo R
+        EX_I       = 4'd4, // Execucao tipo I (addi)
+        EX_MEM     = 4'd5, // Calculo endereco lw/sw
+        WAIT_MEM   = 4'd6, // Espera memoria
+        MEM_READ   = 4'd7, // Leitura da memoria
+        MEM_WRITE  = 4'd8, // Escrita na memoria
+        WB         = 4'd9, // Write-back
+        BRANCH     = 4'd10, // Branch beq
+        JUMP       = 4'd11, // jal
+        JALR_S     = 4'd12  // jalr
+    } state_t;
+
+    state_t estadoAtualReg, proximoEstadoReg;
+
+    assign estadoAtual = estadoAtualReg;
+    assign proximoEstado = proximoEstadoReg;
+
+    // Estado atual (registrador)
+    always_ff @(posedge clock or posedge reset) begin
+        if (reset)
+            estadoAtualReg <= IFETCH;
+        else
+            estadoAtualReg <= proximoEstadoReg;
+    end
+
+    // Transicoes de estado
+    always_comb begin
+        case (estadoAtualReg)
+            IFETCH:     proximoEstadoReg = WAIT_IF;
+            WAIT_IF:    proximoEstadoReg = ID;
+            ID: begin
+                case (opcode)
+                    OPC_RTYPE:    proximoEstadoReg = EX_R;
+                    OPC_OPIMM:    proximoEstadoReg = EX_I;
+                    OPC_LOAD:     proximoEstadoReg = EX_MEM;
+                    OPC_STORE:    proximoEstadoReg = EX_MEM;
+                    OPC_BRANCH:   proximoEstadoReg = BRANCH;
+                    OPC_JAL:      proximoEstadoReg = JUMP;
+                    OPC_JALR:     proximoEstadoReg = JALR_S;
+                    default:      proximoEstadoReg = IFETCH;
+                endcase
+            end
+            EX_R:       proximoEstadoReg = WB;
+            EX_I:       proximoEstadoReg = WB;
+            EX_MEM:     proximoEstadoReg = WAIT_MEM;
+            WAIT_MEM: begin
+                if (opcode == OPC_LOAD)
+                    proximoEstadoReg = MEM_READ;
+                else
+                    proximoEstadoReg = MEM_WRITE;
+            end
+            MEM_READ:   proximoEstadoReg = WB;
+            MEM_WRITE:  proximoEstadoReg = IFETCH;
+            WB:         proximoEstadoReg = IFETCH;
+            BRANCH:     proximoEstadoReg = IFETCH;
+            JUMP:       proximoEstadoReg = IFETCH;
+            JALR_S:     proximoEstadoReg = IFETCH;
+            default:    proximoEstadoReg = IFETCH;
+        endcase
+    end
+
+    // Sinais de controle por estado
+    always_comb begin
+        // Default: tudo desativado
+        MemRead = 0;
+        MemWrite = 0;
+        RegWrite = 0;
+        ALUSrc = 0;
+        MemtoReg = 0;
+        Branch = 0;
+        Jump = 0;
+        Jalr = 0;
+        ALUOp = 2'b00;
+
+        case (estadoAtualReg)
+            IFETCH: begin
+                MemRead = 1;
+            end
+            EX_R: begin
+                ALUOp = 2'b10;
+            end
+            EX_I: begin
+                ALUSrc = 1;
+                ALUOp = 2'b11;
+            end
+            EX_MEM: begin
+                ALUSrc = 1;
+                ALUOp = 2'b00;
+            end
+            WAIT_MEM: begin
+                // nada
+            end
+            MEM_READ: begin
+                MemRead = 1;
+            end
+            MEM_WRITE: begin
+                MemWrite = 1;
+            end
+            WB: begin
+                RegWrite = 1;
+                if (opcode == OPC_LOAD)
+                    MemtoReg = 1;
+            end
+            BRANCH: begin
+                Branch = 1;
+                ALUOp = 2'b01;
+            end
+            JUMP: begin
+                Jump = 1;
+                RegWrite = 1;
+            end
+            JALR_S: begin
+                Jalr = 1;
+                RegWrite = 1;
+                ALUSrc = 1;
+            end
+        endcase
+    end
+endmodule

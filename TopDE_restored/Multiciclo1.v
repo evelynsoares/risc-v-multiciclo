@@ -1,0 +1,242 @@
+
+// multiciclo do gemini
+
+
+`ifndef PARAM
+	`include "Parametros.v"
+`endif
+
+module Multiciclo1 (
+	input logic clockCPU, clockMem,
+	input logic reset,
+	output logic [31:0] PC, 
+	output logic [31:0] Instr, 
+	input  logic [4:0] regin,
+	output logic [31:0] regout,
+	output logic [3:0] estado
+	);
+
+	reg [31:0] PCBack; 
+	
+	initial 
+		begin
+			PC<=32'h0040_0000;
+			PCBack<=32'h0040_0000; 
+			Instr<=32'b0;
+			regout<=32'b0;
+		end
+		
+	// `SaidaULA`, `Leitura2`, `B` são sinais intermediários.
+	// `SaidaULA` pode ser a saída da ULA (ULA_Result).
+	// `B` pode ser o segundo operando da ULA.
+	// `Leitura2` pode ser o dado de rs2.
+	// O seu `wire EscreveMem;` e `wire [31:0] wIouD, MemData, rmem;` serão substituídos/complementados.
+
+	// A `proximo` é o next_state da FSM do controle.
+	wire [3:0] proximo_estado_interna; // Nome mais claro para evitar conflito com 'proximo' já existente
+	assign estado = proximo_estado_interna; // Conecta a saída do estado
+
+//******************************************
+// Aqui vai o seu código do seu processador
+
+    // Sinais e registradores de estado internos do pipeline
+    // PC já está declarado como output logic, mas precisa ser 'reg' para ser atualizado
+    // `output logic [31:0] PC;` na declaração do módulo é OK, mas adicione `reg` para ele:
+    // reg [31:0] PC; -- já é reg pelo initial block.
+
+    // `Instr` já está declarado como output logic, mas precisa ser 'reg' para ser o IR.
+    // reg [31:0] Instr; -- já é reg pelo initial block.
+
+    reg [31:0] ReadData1_Reg;       // Registrador para Dado lido de rs1
+    reg [31:0] ReadData2_Reg;       // Registrador para Dado lido de rs2
+    reg [31:0] SignExtendedImmediate_Reg; // Registrador para Imediato estendido
+    reg [31:0] ALUResult_Reg;       // Registrador para Resultado da ULA
+    reg [31:0] MemReadData_Reg;     // Registrador para Dado lido da memória
+
+    // Sinais de controle do Bloco Controlador
+    wire PCWrite, PCWriteCond, IorD_MemAddrSelect, MemRead_Control, MemWrite_Control, IRWrite_Control, RegWrite_Control, MemtoReg_Control;
+    wire ALUSrcA_Control, ALUSrcB_Control, PCSource_Control, RegDst_Control;
+    wire [1:0] ALUOp_Control;
+    wire [4:0] ALUControlOut_ULA; // Saída do ALUControl para a ULA
+    wire Branch_Control, Jump_Control, Jalr_Control;
+
+    // Sinais da ULA e Banco de Registradores
+    wire [31:0] ULA_OperandA, ULA_OperandB;
+    wire [31:0] ULA_Output; // Saída da ULA
+    wire zero_flag_ULA; // Saída zero da ULA
+
+    // Sinais para Memória Unificada
+    wire [31:0] MemoryAddress;
+    wire [31:0] MemoryDataIn; // Dado para escrever na memória
+    wire [31:0] MemoryDataOut; // Dado lido da memória
+
+    // Módulo de Controle Principal (FSM)
+    ControlUnit_Multicycle control_unit_inst (
+        .clock(clockCPU),
+        .reset(reset),
+        .opcode(Instr[6:0]),
+        .funct3(Instr[14:12]),
+        .funct7(Instr[31:25]),
+        .zero(zero_flag_ULA), // Saída zero da ULA
+        .PCWrite(PCWrite),
+        .PCWriteCond(PCWriteCond),
+        .IorD(IorD_MemAddrSelect),
+        .MemRead(MemRead_Control),
+        .MemWrite(MemWrite_Control),
+        .IRWrite(IRWrite_Control),
+        .RegWrite(RegWrite_Control),
+        .MemtoReg(MemtoReg_Control),
+        .ALUSrcA(ALUSrcA_Control),
+        .ALUSrcB(ALUSrcB_Control),
+        .PCSource(PCSource_Control),
+        .RegDst(RegDst_Control),
+        .ALUOp(ALUOp_Control),
+        .Branch(Branch_Control),
+        .Jump(Jump_Control),
+        .Jalr(Jalr_Control),
+        .current_state_out(proximo_estado_interna) // Conecta ao 'estado' output
+    );
+
+    // Banco de Registradores
+    Registers reg_bank (
+        .clock(clockCPU),
+        .write_enable(RegWrite_Control),
+        .read_reg1(Instr[19:15]), // rs1
+        .read_reg2(Instr[24:20]), // rs2
+        .write_reg(RegDst_Control ? Instr[11:7] : Instr[24:20]), // rd ou rs2/ra
+        .write_data(MemtoReg_Control ? MemReadData_Reg : ALUResult_Reg), // Dado a ser escrito (Memória ou ULA)
+        .read_data1(ReadData1_Reg), // Saída do banco para o registrador pipeline A
+        .read_data2(ReadData2_Reg), // Saída do banco para o registrador pipeline B
+        .regin(regin), // Para monitoramento externo
+        .regout(regout) // Para monitoramento externo
+    );
+
+    // Gerador de Imediatos
+    ImmGen imm_gen_inst (
+        .instruction(Instr),
+        .sign_extended_immediate(SignExtendedImmediate_Reg) // Output do gerador
+    );
+
+    // ULA Control
+    ALUControl alu_control_inst (
+        .ALUOp(ALUOp_Control),
+        .funct3(Instr[14:12]),
+        .funct7(Instr[31:25]),
+        .ALUControlOut(ALUControlOut_ULA)
+    );
+
+    // ULA (ALU)
+    ALU alu_inst (
+        .iControl(ALUControlOut_ULA),
+        .iA(ULA_OperandA),
+        .iB(ULA_OperandB),
+        .oResult(ULA_Output),
+        .zero(zero_flag_ULA) // Saída zero da ULA
+    );
+
+    // MUX para ULA_OperandA
+    assign ULA_OperandA = ALUSrcA_Control ? PC : ReadData1_Reg; // Seleciona PC ou ReadData1
+
+    // MUX para ULA_OperandB
+    assign ULA_OperandB = ALUSrcB_Control ? SignExtendedImmediate_Reg : ReadData2_Reg; // Seleciona Imediato ou ReadData2
+
+    // Memória de Instruções e Dados (IP Core - Exemplo: ram_unified)
+    // *******************************************************************
+    // ATENÇÃO: Seu `ramU MemU` existente precisa ser modificado/reconfigurado
+    // para ser a memória unificada e lidar com os 2 ciclos de latência.
+    // O `ramU` no código original está conectado a `wIouD` e `B` e `EscreveMem`
+    // que são sinais do monociclo. Eles devem ser substituídos pelos novos sinais
+    // `MemoryAddress`, `MemoryDataIn`, `MemWrite_Control`, `MemRead_Control`.
+    // O nome da instância pode ser `memoria_unificada_inst`.
+    // *******************************************************************
+    
+    // Seu ramU existente:
+    // ramU MemU (
+    //  .address(wIouD[11:2]), // `wIouD` deve ser substituído por `MemoryAddress`
+    //  .clock(clockMem),
+    //  .data(B), // `B` deve ser substituído por `MemoryDataIn`
+    //  .wren(EscreveMem), // `EscreveMem` deve ser substituído por `MemWrite_Control`
+    //  .rden(1'b1), // `1'b1` para rden é comum, mas o controle pode desabilitar
+    //  .q(rmem) // `rmem` deve ser substituído por `MemoryDataOut`
+    // );
+    
+    // Substituição (ou reconfiguração do ramU existente)
+    // Exemplo de como ficaria o IP de memória após a geração no Quartus
+    // Assumindo que você chamou a saída de dado de 'q'
+    // E que a memória é de 12 bits de endereço (4KB)
+    ram_unified memoria_unificada_inst ( // Nome do seu módulo de memória IP gerado
+        .address(MemoryAddress[11:2]), // Endereço para a memória
+        .clock(clockMem), // Clock da memória (pode ser diferente do clock da CPU)
+        .data(MemoryDataIn), // Dados a serem escritos na memória
+        .wren(MemWrite_Control), // Sinal de habilitação de escrita
+        .rden(MemRead_Control), // Sinal de habilitação de leitura
+        .q(MemoryDataOut) // Dados lidos da memória
+    );
+
+    // MUX para o endereço da memória (PC ou ALUResult)
+    assign MemoryAddress = IorD_MemAddrSelect ? ALUResult_Reg : PC;
+
+    // Dado para escrita na memória (generalizado, tipicamente rs2 para SW)
+    assign MemoryDataIn = ReadData2_Reg;
+
+    // Registradores de Pipeline (Atualizações síncronas com clockCPU)
+    // PC (Program Counter)
+    always_ff @(posedge clockCPU or posedge reset) begin
+        if (reset) PC <= 32'h0040_0000;
+        else if (PCWrite) begin // PCWrite sinaliza atualização incondicional
+            case (PCSource_Control)
+                2'b00: PC <= PC + 32'd4; // PC + 4
+                2'b01: PC <= ALUResult_Reg; // Branch target (PC + offset)
+                2'b10: PC <= ALUResult_Reg; // JAL target (PC + offset) (ou PC+imediato)
+                2'b11: PC <= ULA_Output; // JALR target (rs1 + imediato)
+                default: PC <= PC + 32'd4;
+            endcase
+        end else if (PCWriteCond && Branch_Control && zero_flag_ULA) begin // Branch condicional
+            PC <= ALUResult_Reg;
+        end
+    end
+
+    // Instruction Register (IR)
+    always_ff @(posedge clockCPU or posedge reset) begin
+        if (reset) Instr <= 32'b0;
+        else if (IRWrite_Control) Instr <= MemoryDataOut; // A instrução é lida da memória
+    end
+
+    // Registradores A, B (para ReadData1, ReadData2)
+    always_ff @(posedge clockCPU or posedge reset) begin
+        if (reset) begin
+            ReadData1_Reg <= 32'b0;
+            ReadData2_Reg <= 32'b0;
+        end else if (proximo_estado_interna == STATE_DECODE) begin // Lê os registradores no estado de decodificação
+            ReadData1_Reg <= reg_bank.read_data1;
+            ReadData2_Reg <= reg_bank.read_data2;
+        end
+    end
+
+    // Registrador ALUOut
+    always_ff @(posedge clockCPU or posedge reset) begin
+        if (reset) ALUResult_Reg <= 32'b0;
+        else if (proximo_estado_interna == STATE_EXECUTE_R_TYPE ||
+                 proximo_estado_interna == STATE_EXECUTE_LOAD_STORE ||
+                 proximo_estado_interna == STATE_BRANCH_EXECUTE ||
+                 proximo_estado_interna == STATE_JALR_EXECUTE) begin // Atualiza em estados de execução
+            ALUResult_Reg <= ULA_Output;
+        end
+    end
+
+    // Registrador MemDataRegister
+    always_ff @(posedge clockCPU or posedge reset) begin
+        if (reset) MemReadData_Reg <= 32'b0;
+        else if (proximo_estado_interna == STATE_LOAD_WAIT2) begin // Quando o dado da memória está disponível
+            MemReadData_Reg <= MemoryDataOut;
+        end
+    end
+
+    // O `PCBack` original pode ser removido, pois o `PC` agora é controlado pelos sinais do `ControlUnit`.
+    // A atribuição `assign EscreveMem = (memWriteEnable && wIouD[28]);` e `assign wIouD = (MemRead | EscreveMem) ? SaidaULA : PC;`
+    // são do modelo Uniciclo e devem ser substituídas pelas novas conexões de `MemoryAddress`, `MemoryDataIn`, `MemWrite_Control`, `MemRead_Control`.
+
+//*****************************************
+	
+			
+endmodule

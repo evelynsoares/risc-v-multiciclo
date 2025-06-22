@@ -1,0 +1,138 @@
+//multiciclo do chat do CHATGPT
+`ifndef PARAM
+	`include "Parametros.v"
+`endif
+
+module Multiciclo (
+	input logic clockCPU, clockMem,
+	input logic reset,
+	output logic [31:0] PC,
+	output logic [31:0] Instr,
+	input  logic [4:0] regin,
+	output logic [31:0] regout,
+	output logic [3:0] estado
+	);
+	
+	reg [31:0] PCBack;
+
+	initial begin
+		PC <= TEXT_ADDRESS;
+		PCBack <= TEXT_ADDRESS;
+		Instr <= 32'b0;
+		regout <= 32'b0;
+	end
+
+	// === Sinais auxiliares para controle ===
+	wire MemRead, MemWrite, RegWrite, ALUSrc, MemtoReg, Branch, Jump, Jalr;
+	wire [1:0] ALUOp;
+	wire [6:0] opcode = Instr[6:0];
+	wire [3:0] proximo;
+
+	// === Instância do Controlador Multiciclo ===
+	ControlMulticiclo ctrl (
+		.clock(clockCPU),
+		.reset(reset),
+		.opcode(opcode),
+		.estadoAtual(estado),
+		.proximoEstado(proximo),
+		.MemRead(MemRead),
+		.MemWrite(MemWrite),
+		.RegWrite(RegWrite),
+		.ALUSrc(ALUSrc),
+		.MemtoReg(MemtoReg),
+		.Branch(Branch),
+		.Jump(Jump),
+		.Jalr(Jalr),
+		.ALUOp(ALUOp)
+	);
+
+	// === Estado atual ===
+	always @(posedge clockCPU or posedge reset) begin
+		if(reset) begin
+			PC <= TEXT_ADDRESS;
+			PCBack <= TEXT_ADDRESS;
+			estado <= 4'b0000;
+		end else begin
+			estado <= proximo;
+		end
+	end
+
+	// === Sinais auxiliares ===
+	wire [31:0] wIouD, MemData, rmem;
+	wire [31:0] SaidaULA, Leitura1, Leitura2, B, Imediato, WriteBack;
+	wire EscreveMem;
+	wire [4:0] aluControlOut;
+
+	assign wIouD = (MemRead | EscreveMem) ? SaidaULA : PC;
+	assign EscreveMem = (MemWrite && wIouD[28]);
+
+	// === Memória unificada (Von Neumann) ===
+	ramU MemU (
+		.address(wIouD[11:2]),
+		.clock(clockMem),
+		.data(B),
+		.wren(EscreveMem),
+		.rden(1'b1),
+		.q(rmem)
+	);
+
+	assign Instr = rmem;
+
+	// === Gerador de Imediatos ===
+	ImmGen gerador (
+		.iInstrucao(Instr),
+		.oImm(Imediato)
+	);
+
+	// === Banco de Registradores ===
+	Registers banco (
+		.iCLK(clockCPU),
+		.iRST(reset),
+		.iRegWrite(RegWrite),
+		.iReadRegister1(Instr[19:15]),
+		.iReadRegister2(Instr[24:20]),
+		.iWriteRegister(Instr[11:7]),
+		.iWriteData(WriteBack),
+		.oReadData1(Leitura1),
+		.oReadData2(Leitura2),
+		.iRegDispSelect(regin),
+		.oRegDisp(regout)
+	);
+
+	// === ALU Control ===
+	ALUControl aluCtrl (
+		.ALUOp(ALUOp),
+		.funct3(Instr[14:12]),
+		.funct7(Instr[31:25]),
+		.ALUControlOut(aluControlOut)
+	);
+
+	// === ALU ===
+	ALU alu (
+		.iControl(aluControlOut),
+		.iA(Leitura1),
+		.iB(ALUSrc ? Imediato : Leitura2),
+		.oResult(SaidaULA)
+	);
+
+	assign B = Leitura2;
+	assign MemData = rmem;
+
+	assign WriteBack = (MemtoReg ? MemData : SaidaULA);
+
+	// === Atualização de PC (exemplo simplificado) ===
+	always_ff @(posedge clockCPU) begin
+		if (Jump) begin
+			PC <= PC + Imediato;
+		end else if (Jalr) begin
+			PC <= (Leitura1 + Imediato) & ~32'd1;
+		end else if (Branch && SaidaULA == 0) begin
+			PC <= PC + Imediato;
+		end else if (estado == 4'd0) begin
+			PC <= PC;
+		end else begin
+			PC <= PC + 4;
+		end
+	end
+
+endmodule
