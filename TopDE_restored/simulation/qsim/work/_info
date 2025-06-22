@@ -1,0 +1,75 @@
+m255
+K4
+z2
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+dC:/Users/alicc/Downloads/Lab2/Lab2/TopDE_restored/simulation/qsim
+vhard_block
+Z0 !s110 1750598086
+!i10b 1
+!s100 @>R0BFl[dzY5>]BZ9Vb=e0
+I@Y[Tk]j=Wd;Ya[iZ71mAf0
+Z1 VDg1SIo80bB@j0V0VzS_@n1
+Z2 dC:/Users/Evelyn/Downloads/GrupoD8_Lab3/GrupoD8_Lab3/TopDE_restored/simulation/qsim
+Z3 w1750598084
+Z4 8TopDE.vo
+Z5 FTopDE.vo
+L0 78320
+Z6 OV;L;10.5b;63
+r1
+!s85 0
+31
+Z7 !s108 1750598085.000000
+Z8 !s107 TopDE.vo|
+Z9 !s90 -work|work|TopDE.vo|
+!i113 1
+Z10 o-work work
+Z11 tCvgOpt 0
+vTopDE
+R0
+!i10b 1
+!s100 [8ieD4[_aCTl:0=9ldlc`2
+I@5ZSAR0fn72_2WRHJXl:F3
+R1
+R2
+R3
+R4
+R5
+L0 31
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@top@d@e
+vTopDE_vlg_vec_tst
+R0
+!i10b 1
+!s100 L`inJ_R_<VQUQCZ?93^Y=3
+I<7ned<I<G>`8<Q^7ag=f:2
+R1
+R2
+w1750598081
+8TopDE.vwf.vt
+FTopDE.vwf.vt
+L0 29
+R6
+r1
+!s85 0
+31
+!s108 1750598086.000000
+!s107 TopDE.vwf.vt|
+!s90 -work|work|TopDE.vwf.vt|
+!i113 1
+R10
+R11
+n@top@d@e_vlg_vec_tst
