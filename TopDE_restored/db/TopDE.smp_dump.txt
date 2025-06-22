@@ -1,0 +1,17 @@
+
+State Machine - |TopDE|Multiciclo:MULT1|ControlMulticiclo:ctrl|estadoReg
+Name estadoReg.JALR_EX estadoReg.JUMP_EX estadoReg.BRANCH_EX estadoReg.WB estadoReg.MEM_WRITE_FINISH estadoReg.MEM_READ_WB estadoReg.WAIT_MEM2 estadoReg.WAIT_MEM1 estadoReg.EX_MEM_ADDR estadoReg.EX_I estadoReg.EX_R estadoReg.ID estadoReg.WAIT_IF estadoReg.IFETCH 
+estadoReg.IFETCH 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+estadoReg.WAIT_IF 0 0 0 0 0 0 0 0 0 0 0 0 1 1 
+estadoReg.ID 0 0 0 0 0 0 0 0 0 0 0 1 0 1 
+estadoReg.EX_R 0 0 0 0 0 0 0 0 0 0 1 0 0 1 
+estadoReg.EX_I 0 0 0 0 0 0 0 0 0 1 0 0 0 1 
+estadoReg.EX_MEM_ADDR 0 0 0 0 0 0 0 0 1 0 0 0 0 1 
+estadoReg.WAIT_MEM1 0 0 0 0 0 0 0 1 0 0 0 0 0 1 
+estadoReg.WAIT_MEM2 0 0 0 0 0 0 1 0 0 0 0 0 0 1 
+estadoReg.MEM_READ_WB 0 0 0 0 0 1 0 0 0 0 0 0 0 1 
+estadoReg.MEM_WRITE_FINISH 0 0 0 0 1 0 0 0 0 0 0 0 0 1 
+estadoReg.WB 0 0 0 1 0 0 0 0 0 0 0 0 0 1 
+estadoReg.BRANCH_EX 0 0 1 0 0 0 0 0 0 0 0 0 0 1 
+estadoReg.JUMP_EX 0 1 0 0 0 0 0 0 0 0 0 0 0 1 
+estadoReg.JALR_EX 1 0 0 0 0 0 0 0 0 0 0 0 0 1 
