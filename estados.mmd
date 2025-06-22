@@ -1,0 +1,44 @@
+graph TD
+    Reset --> IFETCH
+    IFETCH --> WAIT_IF
+    WAIT_IF --> ID
+
+    ID -->|opcode == OPC_RTYPE| EX_R
+    ID -->|opcode == OPC_OPIMM| EX_I
+    ID -->|opcode == OPC_LOAD or OPC_STORE| EX_MEM_ADDR
+    ID -->|opcode == OPC_BRANCH| BRANCH_EX
+    ID -->|opcode == OPC_JAL| JUMP_EX
+    ID -->|opcode == OPC_JALR| JALR_EX
+    ID -->|default| IFETCH
+
+    EX_R --> WB
+    EX_I --> WB
+    EX_MEM_ADDR --> WAIT_MEM1
+    WAIT_MEM1 --> WAIT_MEM2
+
+    WAIT_MEM2 -->|opcode == OPC_LOAD| MEM_READ_WB
+    WAIT_MEM2 -->|opcode == OPC_STORE| MEM_WRITE_FINISH
+
+    MEM_READ_WB --> WB
+    MEM_WRITE_FINISH --> IFETCH
+    WB --> IFETCH
+    BRANCH_EX --> IFETCH
+    JUMP_EX --> IFETCH
+    JALR_EX --> IFETCH
+
+    subgraph States_and_Control_Signals
+        IFETCH["IFETCH (0)\nMemRead, IRWrite, IorD=0, PCWrite, PCSource=00"]
+        WAIT_IF["WAIT_IF (1)"]
+        ID["ID (2)"]
+        EX_R["EX_R (3)\nALUOp=10, ALUSrcA=0, ALUSrcB=0, RegDst=1"]
+        EX_I["EX_I (4)\nALUSrcA=0, ALUSrcB=1, ALUOp=11, RegDst=0"]
+        EX_MEM_ADDR["EX_MEM_ADDR (5)\nALUSrcA=0, ALUSrcB=1, ALUOp=00, IorD=1"]
+        WAIT_MEM1["WAIT_MEM1 (6)"]
+        WAIT_MEM2["WAIT_MEM2 (7)\nOPC_LOAD: MemRead, OPC_STORE: MemWrite"]
+        MEM_READ_WB["MEM_READ_WB (8)\nMemtoReg=1"]
+        MEM_WRITE_FINISH["MEM_WRITE_FINISH (9)\nMemWrite=1"]
+        WB["WB (10)\nRegWrite=1, OPC_LOAD: MemtoReg=1,\nRTYPE/OPIMM/LOAD: RegDst=1"]
+        BRANCH_EX["BRANCH_EX (11)\nALUOp=01, ALUSrcA=0, ALUSrcB=0,\nPCWriteCond=1, PCSource=01"]
+        JUMP_EX["JUMP_EX (12)\nJump, RegWrite, RegDst=1,\nPCWrite=1, PCSource=10"]
+        JALR_EX["JALR_EX (13)\nJalr, RegWrite, RegDst=1,\nALUSrcA=0, ALUSrcB=1, ALUOp=00,\nPCWrite=1, PCSource=11"]
+    end

@@ -1,0 +1,23 @@
+DEPTH = 16384;
+WIDTH = 32;
+ADDRESS_RADIX = HEX;
+DATA_RADIX = HEX;
+CONTENT
+BEGIN
+00000000 : 00200293;   % 6:     addi t0, zero, 2 %
+00000001 : 00500313;   % 7:     addi t1, zero, 5 %
+00000002 : 005302b3;   % 8:     add t0, t1, t0 %
+00000003 : 405302b3;   % 9:     sub t0, t1, t0 %
+00000004 : 005372b3;   % 10:     and t0, t1, t0 %
+00000005 : 005362b3;   % 11:     or t0, t1, t0 %
+00000006 : 0fc10317;   % 13:     la t1, valor 	# carrega endereco %
+00000007 : fe830313;   % 13:  %
+00000008 : 00032383;   % 14:     lw t2, 0(t1) %
+00000009 : 00732223;   % 15:     sw t2, 4(t1) %
+0000000a : 00628a63;   % 17:     beq t0, t1, FIM 	# nao deve pular pra FIM %
+0000000b : 008000ef;   % 18:     jal ra, FUNCAO	# pula e salva pc+4 em ra %
+0000000c : 00c0006f;   % 21:     jal zero, FIM  %
+0000000d : 00300293;   % 24:     addi t0, zero, 3 %
+0000000e : 00008067;   % 25:     jalr zero, 0(ra)	# pula pra volta  %
+0000000f : 0000006f;   % 28:     jal zero, FIM %
+END;
